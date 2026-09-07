@@ -1,0 +1,25 @@
+const cursor = document.querySelector('.cursor');
+const menuToggle = document.querySelector('.menu-toggle');
+const nav = document.querySelector('.nav');
+document.body.style.cursor = 'auto';
+document.querySelectorAll('a, button, summary').forEach((element) => { element.style.cursor = 'pointer'; });
+
+window.addEventListener('pointermove', (event) => {
+  if (cursor) {
+    cursor.style.left = `${event.clientX}px`;
+    cursor.style.top = `${event.clientY}px`;
+  }
+});
+
+menuToggle?.addEventListener('click', () => {
+  const isOpen = nav.classList.toggle('is-open');
+  menuToggle.setAttribute('aria-expanded', String(isOpen));
+});
+nav?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => {
+  nav.classList.remove('is-open');
+  menuToggle?.setAttribute('aria-expanded', 'false');
+}));
+document.querySelectorAll('a, button, summary').forEach((element) => {
+  element.addEventListener('mouseenter', () => cursor?.classList.add('is-hover'));
+  element.addEventListener('mouseleave', () => cursor?.classList.remove('is-hover'));
+});
