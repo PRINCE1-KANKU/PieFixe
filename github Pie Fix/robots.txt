@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /blog-admin.html
-
-Sitemap: https://piefixe.co.za/sitemap.xml

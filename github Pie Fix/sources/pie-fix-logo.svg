@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" role="img" aria-labelledby="title desc">
-  <title id="title">Pie Fixe logo</title>
-  <desc id="desc">Orange circle with a P beside the Pie Fixe wordmark.</desc>
-  <rect width="640" height="180" fill="none"/>
-  <circle cx="90" cy="90" r="62" fill="#f2673a"/>
-  <text x="90" y="113" text-anchor="middle" fill="#171717" font-family="Arial, sans-serif" font-size="76" font-weight="800">P</text>
-  <text x="180" y="112" fill="#171717" font-family="Arial, sans-serif" font-size="72" font-weight="800" letter-spacing="-5">PIE FIXE</text>
-</svg>
