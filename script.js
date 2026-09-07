@@ -3,22 +3,25 @@ const canvas = document.querySelector('.cube-canvas');
 const context = canvas.getContext('2d');
 const cursor = document.querySelector('.cursor');
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isMobile = window.matchMedia('(max-width: 800px)').matches;
+const hasFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 let pointer = { x: window.innerWidth * 0.5, y: window.innerHeight * 0.45 };
 let targetPointer = { ...pointer };
 let cubes = [];
 let scrollY = window.scrollY;
 let targetScrollY = scrollY;
+let lastCanvasFrame = 0;
 
 window.addEventListener('load', () => {
   window.setTimeout(() => loader.classList.add('is-done'), prefersReducedMotion ? 0 : 1400);
 });
 
 function resizeCanvas() {
-  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const ratio = Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 2);
   canvas.width = window.innerWidth * ratio;
   canvas.height = window.innerHeight * ratio;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  const count = window.innerWidth < 700 ? 18 : 36;
+  const count = isMobile ? 10 : 36;
   cubes = Array.from({ length: count }, (_, index) => ({
     x: Math.random() * window.innerWidth,
     y: Math.random() * window.innerHeight,
@@ -67,6 +70,8 @@ function drawCube(cube, time) {
 }
 
 function updateSectionDepth() {
+  if (isMobile) return;
+
   document.querySelectorAll('main > section').forEach((section) => {
     const bounds = section.getBoundingClientRect();
     const sectionCenter = bounds.top + bounds.height / 2;
@@ -79,6 +84,11 @@ function updateSectionDepth() {
 }
 
 function animate(time) {
+  if (isMobile && time - lastCanvasFrame < 33) {
+    requestAnimationFrame(animate);
+    return;
+  }
+  lastCanvasFrame = time;
   context.clearRect(0, 0, window.innerWidth, window.innerHeight);
   pointer.x += (targetPointer.x - pointer.x) * 0.035;
   pointer.y += (targetPointer.y - pointer.y) * 0.035;
@@ -92,13 +102,15 @@ window.addEventListener('resize', resizeCanvas);
 window.addEventListener('scroll', () => {
   targetScrollY = window.scrollY;
 }, { passive: true });
-window.addEventListener('pointermove', (event) => {
-  targetPointer = { x: event.clientX, y: event.clientY };
-  if (cursor) {
-    cursor.style.left = `${event.clientX}px`;
-    cursor.style.top = `${event.clientY}px`;
-  }
-});
+if (hasFinePointer) {
+  window.addEventListener('pointermove', (event) => {
+    targetPointer = { x: event.clientX, y: event.clientY };
+    if (cursor) {
+      cursor.style.left = `${event.clientX}px`;
+      cursor.style.top = `${event.clientY}px`;
+    }
+  });
+}
 resizeCanvas();
 requestAnimationFrame(animate);
 
@@ -116,10 +128,12 @@ if (!prefersReducedMotion) {
   document.querySelectorAll('.reveal').forEach((element) => element.classList.add('is-visible'));
 }
 
-document.querySelectorAll('a, button, input, select, textarea').forEach((element) => {
-  element.addEventListener('mouseenter', () => cursor?.classList.add('is-hover'));
-  element.addEventListener('mouseleave', () => cursor?.classList.remove('is-hover'));
-});
+if (hasFinePointer) {
+  document.querySelectorAll('a, button, input, select, textarea').forEach((element) => {
+    element.addEventListener('mouseenter', () => cursor?.classList.add('is-hover'));
+    element.addEventListener('mouseleave', () => cursor?.classList.remove('is-hover'));
+  });
+}
 
 const menuToggle = document.querySelector('.menu-toggle');
 const nav = document.querySelector('.nav');

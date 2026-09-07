@@ -7,6 +7,7 @@ body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--bo
 a { color:inherit; text-decoration:none; }
 button, input, select, textarea { font:inherit; }
 button, a { cursor:none; }
+:focus-visible { outline:2px solid var(--orange); outline-offset:4px; }
 .loader { position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:var(--ink); color:var(--cream); overflow:hidden; transition:clip-path 1s cubic-bezier(.77,0,.18,1) .25s; clip-path:circle(150% at 50% 50%); }
 .loader.is-done { clip-path:circle(0% at 50% 50%); pointer-events:none; }
 .loader__pulse { position:absolute; width:22vw; height:22vw; min-width:180px; min-height:180px; border-radius:50%; background:var(--orange); filter:blur(55px); opacity:.85; animation:pulse 1.8s ease-in-out infinite; }
@@ -72,4 +73,11 @@ h1 em, h2 em { font-style:normal; color:var(--orange); }
 @media (max-width:430px) { .hero__actions { align-items:flex-start; flex-direction:column; gap:22px; }.service-card { min-height:245px; }.service-card h3 + p { display:none; }.service-card h3 { font-size:1.45rem; }.booking-form { display:block; }.booking-form label { margin-bottom:23px; }.booking-form .button, .form-note, .form-success { width:auto; margin-top:8px; }.site-footer { display:flex; flex-wrap:wrap; }.site-footer p { width:100%; }.site-footer small { margin-left:auto; } }
 @media (max-width:900px) and (min-width:801px) { .nav, .site-header > .button { display:none; }.menu-toggle { display:block; }.nav.is-open { position:absolute; display:flex; z-index:5; left:0; right:0; top:86px; padding:25px 6vw; background:var(--cream); flex-direction:column; gap:19px; border-bottom:1px solid var(--line); } }
 @media (max-width:800px) { .hero__visual { right:0; top:31%; width:72vw; opacity:.28; } }
+@media (max-width:800px) {
+	.cube-canvas { opacity:.35; }
+	.grain { opacity:.06; animation:none; }
+	.site-header { backdrop-filter:none; }
+	.ticker__track { animation-duration:36s; }
+	main > section { transform:none; will-change:auto; }
+}
 @media (prefers-reduced-motion:reduce) { *, *:before, *:after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; } }
