@@ -8,9 +8,9 @@ mapFrame?.setAttribute('loading', 'lazy');
 const pageHero = document.querySelector('.page-hero');
 const pagePath = window.location.pathname;
 const serviceArea = 'Johannesburg, including Sandton, Randburg, Midrand and surrounding areas';
-const localMeta = pagePath.endsWith('services.html')
+const localMeta = pagePath.startsWith('/services')
   ? { title: 'Same-day appliance repairs | Johannesburg | Pie Fixe', description: `Same-day TV, oven, fridge, freezer and aircon repair callouts across ${serviceArea}, subject to availability.` }
-  : pagePath.endsWith('contact.html')
+  : pagePath.startsWith('/contact')
     ? { title: 'Same-day appliance callouts | Johannesburg | Pie Fixe', description: `Contact Pie Fixe for same-day appliance repair callouts across ${serviceArea}, subject to availability.` }
     : null;
 if (localMeta) {
@@ -24,9 +24,9 @@ if (localMeta) {
   proof.prepend(sameDay);
 }
 const footerNote = document.querySelector('.site-footer small');
-if (footerNote && !footerNote.querySelector('a[href="privacy.html"]')) {
+if (footerNote && !footerNote.querySelector('a[href="/privacy/"]')) {
   const privacyLink = document.createElement('a');
-  privacyLink.href = 'privacy.html';
+  privacyLink.href = '/privacy/';
   privacyLink.textContent = 'Privacy policy';
   footerNote.prepend(privacyLink, document.createElement('br'));
 }
