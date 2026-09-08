@@ -50,7 +50,11 @@
     });
   }
 
-  fetch(`${window.PIE_FIXE_API}/posts`)
+  function loadPosts() {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+
+    fetch(`${window.PIE_FIXE_API}/posts`, { signal: controller.signal })
     .then((response) => (response.ok ? response.json() : []))
     .then((posts) => {
       if (!Array.isArray(posts) || posts.length === 0) return;
@@ -60,5 +64,13 @@
     })
     .catch(() => {
       // Network or server unavailable — the static articles already on the page still work fine.
-    });
+    })
+      .finally(() => window.clearTimeout(timeout));
+  }
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(loadPosts, { timeout: 1200 });
+  } else {
+    window.setTimeout(loadPosts, 250);
+  }
 })();

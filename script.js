@@ -11,9 +11,10 @@ let cubes = [];
 let scrollY = window.scrollY;
 let targetScrollY = scrollY;
 let lastCanvasFrame = 0;
+let sectionFramePending = false;
 
 window.addEventListener('load', () => {
-  window.setTimeout(() => loader.classList.add('is-done'), prefersReducedMotion ? 0 : 1400);
+  window.setTimeout(() => loader.classList.add('is-done'), prefersReducedMotion || isMobile ? 0 : 650);
 });
 
 function resizeCanvas() {
@@ -21,7 +22,7 @@ function resizeCanvas() {
   canvas.width = window.innerWidth * ratio;
   canvas.height = window.innerHeight * ratio;
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  const count = isMobile ? 10 : 36;
+  const count = isMobile ? 10 : 28;
   cubes = Array.from({ length: count }, (_, index) => ({
     x: Math.random() * window.innerWidth,
     y: Math.random() * window.innerHeight,
@@ -83,7 +84,17 @@ function updateSectionDepth() {
   });
 }
 
+function requestSectionDepthUpdate() {
+  if (isMobile || sectionFramePending) return;
+  sectionFramePending = true;
+  requestAnimationFrame(() => {
+    sectionFramePending = false;
+    updateSectionDepth();
+  });
+}
+
 function animate(time) {
+  if (document.hidden) return;
   if (isMobile && time - lastCanvasFrame < 33) {
     requestAnimationFrame(animate);
     return;
@@ -93,7 +104,6 @@ function animate(time) {
   pointer.x += (targetPointer.x - pointer.x) * 0.035;
   pointer.y += (targetPointer.y - pointer.y) * 0.035;
   scrollY += (targetScrollY - scrollY) * 0.08;
-  updateSectionDepth();
   cubes.forEach((cube) => drawCube(cube, time));
   requestAnimationFrame(animate);
 }
@@ -101,6 +111,7 @@ function animate(time) {
 window.addEventListener('resize', resizeCanvas);
 window.addEventListener('scroll', () => {
   targetScrollY = window.scrollY;
+  requestSectionDepthUpdate();
 }, { passive: true });
 if (hasFinePointer) {
   window.addEventListener('pointermove', (event) => {
@@ -112,7 +123,11 @@ if (hasFinePointer) {
   });
 }
 resizeCanvas();
-requestAnimationFrame(animate);
+requestSectionDepthUpdate();
+if (!prefersReducedMotion) requestAnimationFrame(animate);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !prefersReducedMotion) requestAnimationFrame(animate);
+});
 
 if (!prefersReducedMotion) {
   const revealObserver = new IntersectionObserver((entries) => {
