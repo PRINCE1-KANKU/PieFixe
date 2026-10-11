@@ -541,13 +541,17 @@ let audioCtx=null, muted=localStorage.getItem('crg-muted')==='1';
 // ---------------- sound effects ----------------
 const SFX_DIR='sound affects';
 const sfxCache={};
+let lastSfx=null;   // the currently-playing effect, so a new one can cut it off
 function sfx(name){
   if(muted) return;
   try{
     if(!sfxCache[name]) sfxCache[name]=new Audio(encodeURI(`${SFX_DIR}/${name}.mp4`));
-    const a=sfxCache[name].cloneNode();   // clone so rapid back-to-back plays overlap
+    if(lastSfx){ lastSfx.pause(); lastSfx.currentTime=0; }   // stop the previous one — no overlap
+    const a=sfxCache[name];
     a.volume=0.85;
+    a.currentTime=0;
     const pr=a.play(); if(pr) pr.catch(()=>{});
+    lastSfx=a;
   }catch(e){}
 }
 // preload so the first play isn't delayed
