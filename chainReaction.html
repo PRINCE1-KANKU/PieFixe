@@ -1,0 +1,1289 @@
+ and other <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Chain Reaction — Online Multiplayer</title>
+<meta name="description" content="Chain Reaction — free online multiplayer strategy game for 2–6 players. Place orbs, trigger chain explosions, capture the board.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='38' fill='%23ff3131'/%3E%3Ccircle cx='38' cy='36' r='12' fill='%23ffffff' opacity='.55'/%3E%3C/svg%3E">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  /* ==================== THEME SYSTEM ==================== */
+  :root{ --pip-radius:50%; }
+  body[data-theme="nothing"]{
+    --bg:#090909; --card:#101010; --card2:#171717; --line:#2b2b2b;
+    --text:#f2f2f2; --dim:#8a8a8a; --accent:#ff3131;
+    --font-body:"Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    --font-display:"DotGothic16","Segoe UI",monospace;
+    --radius:12px; --radius-sm:8px; --btn-radius:8px; --pip-radius:3px;
+    --board-bg:rgba(255,255,255,.03); --cell-bg:rgba(255,255,255,.02);
+  }
+  body[data-theme="apple"]{
+    --bg:#f5f5f7; --card:rgba(255,255,255,.78); --card2:rgba(255,255,255,.6); --line:rgba(0,0,0,.09);
+    --text:#1d1d1f; --dim:#86868b; --accent:#0071e3;
+    --font-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+    --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,sans-serif;
+    --radius:22px; --radius-sm:14px; --btn-radius:999px; --pip-radius:50%;
+    --board-bg:rgba(0,0,0,.04); --cell-bg:rgba(255,255,255,.55);
+  }
+  body[data-theme="arcade"]{
+    --bg:#0d0221; --card:#170b36; --card2:#1f1049; --line:#432a86;
+    --text:#f4eeff; --dim:#9d8fd0; --accent:#ff2079;
+    --font-body:"Cascadia Mono",ui-monospace,Consolas,monospace;
+    --font-display:"Press Start 2P","Cascadia Mono",monospace;
+    --radius:8px; --radius-sm:6px; --btn-radius:6px; --pip-radius:50%;
+    --board-bg:rgba(0,0,0,.35); --cell-bg:rgba(255,255,255,.03);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    min-height:100dvh;
+  }
+  body[data-theme="nothing"]{
+    background-image:radial-gradient(rgba(255,255,255,.055) 1px, transparent 1.6px);
+    background-size:16px 16px;
+  }
+  body[data-theme="apple"]{
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(0,113,227,.09), transparent 60%),
+      radial-gradient(900px 500px at 88% -10%, rgba(255,45,146,.07), transparent 60%),
+      var(--bg);
+  }
+  body[data-theme="arcade"]{
+    background:
+      radial-gradient(1000px 600px at 50% -20%, #31135f 0%, transparent 60%),
+      radial-gradient(800px 500px at 90% 110%, rgba(4,217,255,.12), transparent 60%),
+      var(--bg);
+  }
+  /* arcade CRT scanlines */
+  body[data-theme="arcade"]::after{
+    content:""; position:fixed; inset:0; z-index:9999; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+  }
+  /* per-theme flourishes */
+  body[data-theme="apple"] .card,
+  body[data-theme="apple"] .chat{
+    backdrop-filter:saturate(180%) blur(18px); -webkit-backdrop-filter:saturate(180%) blur(18px);
+    box-shadow:0 8px 30px rgba(0,0,0,.08);
+  }
+  body[data-theme="nothing"] .logo{background:none; color:var(--text); letter-spacing:10px;}
+  body[data-theme="nothing"] .logo::after{content:"."; color:var(--accent);}
+  body[data-theme="apple"] .logo{background:none; color:var(--text); letter-spacing:-1px;}
+  body[data-theme="arcade"] .logo{
+    font-size:clamp(18px,4.4vw,36px); letter-spacing:2px;
+    background:linear-gradient(90deg,#ff2079,#f9f002,#04d9ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 14px rgba(255,32,121,.45));
+  }
+  body[data-theme="arcade"] .logo2{font-size:15px; letter-spacing:1px;}
+  body[data-theme="arcade"] #status-line{font-size:12px; letter-spacing:1px; text-transform:uppercase;}
+  body[data-theme="arcade"] #end-title{font-size:18px; line-height:1.7;}
+  body[data-theme="arcade"] .code-box b{font-size:18px; letter-spacing:4px;}
+  body[data-theme="nothing"] .btn{text-transform:uppercase; letter-spacing:2px; font-size:13px; font-weight:600;}
+  body[data-theme="arcade"] .btn{font-family:var(--font-display); font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:12px 14px;}
+  body[data-theme="arcade"] .btn.ghost{font-family:var(--font-body); font-size:12px; text-transform:none; letter-spacing:0; padding:8px 14px;}
+  body[data-theme="arcade"] .btn.primary{box-shadow:0 0 14px -2px var(--accent);}
+  body[data-theme="arcade"] .code-box{box-shadow:0 0 18px -8px var(--accent);}
+  body[data-theme="apple"] .pip{box-shadow:0 1px 3px rgba(0,0,0,.15), 0 0 6px -2px var(--c);}
+  body[data-theme="arcade"] .pip{box-shadow:0 2px 5px rgba(0,0,0,.35), 0 0 9px -2px var(--c);}
+  /* Nothing: LED tiles get a faint orbiting glint around the perimeter */
+  body[data-theme="nothing"] .pip{
+    background-image:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,.16) 15%, transparent 36%),
+      radial-gradient(circle at 50% 55%, transparent 52%, rgba(0,0,0,.16) 84%, rgba(0,0,0,.24) 100%);
+    box-shadow:0 2px 5px rgba(0,0,0,.4), 0 0 6px -2px var(--c);
+  }
+  body[data-theme="nothing"] .pip::before{
+    background:radial-gradient(circle, rgba(255,255,255,.6) 0%, rgba(255,255,255,.22) 45%, transparent 72%);
+    width:26%; height:26%; left:10%; top:8%;
+    animation:orbitGlint 2.8s linear infinite;
+  }
+  body[data-theme="nothing"] .cell.hot:not(.pop) .pip::before{animation-duration:1.1s;}
+  @keyframes orbitGlint{
+    0%{left:10%; top:8%;} 25%{left:62%; top:10%;} 50%{left:64%; top:62%;} 75%{left:12%; top:64%;} 100%{left:10%; top:8%;}
+  }
+  body[data-theme="apple"] #board.playable .cell.can:hover{background:rgba(0,0,0,.07);}
+  /* ---------- theme picker ---------- */
+  .theme-picker{display:flex; gap:12px; justify-content:center; margin-bottom:22px; flex-wrap:wrap;}
+  .theme-opt{
+    display:flex; flex-direction:column; align-items:center; gap:8px; min-width:96px;
+    padding:12px 18px; border-radius:var(--radius-sm); border:1px solid var(--line);
+    background:var(--card2); color:var(--dim); font-size:13px; font-family:var(--font-body); transition:.15s;
+  }
+  .theme-opt:hover{transform:translateY(-2px);}
+  .theme-opt.active{color:var(--text); border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+  .tp{display:flex; gap:5px;}
+  .tp i{width:13px; height:13px; border-radius:50%; display:block; border:1px solid rgba(127,127,127,.35);}
+  .theme-opt[data-theme-name="nothing"] .tp i:nth-child(1){background:#0a0a0a;}
+  .theme-opt[data-theme-name="nothing"] .tp i:nth-child(2){background:#ff3131;}
+  .theme-opt[data-theme-name="nothing"] .tp i:nth-child(3){background:#f2f2f2;}
+  .theme-opt[data-theme-name="apple"] .tp i:nth-child(1){background:#f5f5f7;}
+  .theme-opt[data-theme-name="apple"] .tp i:nth-child(2){background:#0071e3;}
+  .theme-opt[data-theme-name="apple"] .tp i:nth-child(3){background:#1d1d1f;}
+  .theme-opt[data-theme-name="arcade"] .tp i:nth-child(1){background:#0d0221;}
+  .theme-opt[data-theme-name="arcade"] .tp i:nth-child(2){background:#ff2079;}
+  .theme-opt[data-theme-name="arcade"] .tp i:nth-child(3){background:#04d9ff;}
+  .theme-select{font-size:13px; padding:6px 10px;}
+  .theme-picker .theme-opt{min-height:44px;}   /* comfortable touch target */
+  .hidden{display:none !important;}
+  button{font-family:inherit; cursor:pointer;}
+  input,select{font-family:inherit;}
+
+  /* ---------- screens ---------- */
+  .screen{max-width:980px; margin:0 auto; padding:24px 16px 48px; padding-bottom:calc(48px + env(safe-area-inset-bottom));}
+  .logo{
+    text-align:center; font-size:clamp(34px,6vw,58px); letter-spacing:4px; font-weight:800;
+    font-family:var(--font-display);
+    background:linear-gradient(90deg,#ff5252,#ffd740,#4caf50,#40a0ff,#ab47bc);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin-top:24px;
+  }
+  .tagline{text-align:center; color:var(--dim); margin:8px 0 28px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:22px; box-shadow:0 12px 40px rgba(0,0,0,.35);}
+  h1.logo2{font-size:26px; margin-bottom:14px; text-align:center; font-family:var(--font-display);}
+  label{display:block; font-size:13px; color:var(--dim); margin-bottom:6px;}
+  input[type=text], input:not([type]), select{
+    background:var(--card2); border:1px solid var(--line); color:var(--text);
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:16px; outline:none; width:100%;
+  }
+  input:focus, select:focus{border-color:var(--accent);}
+  .btn{
+    background:var(--card2); color:var(--text); border:1px solid var(--line);
+    border-radius:var(--btn-radius); padding:10px 16px; font-size:15px; transition:.15s;
+    min-height:44px; min-width:44px; touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:hover{border-color:var(--accent); transform:translateY(-1px);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
+  .btn.primary:hover{filter:brightness(1.12);}
+  .btn.ghost{background:transparent;}
+  .btn:disabled{opacity:.45; cursor:not-allowed; transform:none;}
+  .row{display:flex; gap:10px; align-items:center;}
+
+  .home-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:18px;}
+  .panel{background:var(--card2); border:1px solid var(--line); border-radius:var(--radius-sm); padding:16px;}
+  .panel h2{font-size:16px; margin-bottom:6px;}
+  .panel p{font-size:13px; color:var(--dim); margin-bottom:12px;}
+  .panel .btn{width:100%;}
+  #inp-code{text-transform:uppercase; letter-spacing:3px; text-align:center; font-weight:700;}
+  /* ---------- lobby ---------- */
+  .code-box{
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    background:var(--card2); border:1px dashed var(--accent); border-radius:var(--radius-sm);
+    padding:12px; margin-bottom:16px; font-size:15px;
+  }
+  .code-box b{font-size:26px; letter-spacing:6px; color:var(--accent); font-family:var(--font-display);}
+  #lobby-players{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; min-height:38px;}
+  #lobby-hint{color:var(--dim); font-size:13px; text-align:center; margin-top:10px;}
+  #btn-start{width:100%; margin-top:14px;}
+  #btn-leave-lobby{width:100%; margin-top:10px;}
+
+  .chip{
+    display:flex; align-items:center; gap:8px; background:var(--card2);
+    border:1px solid var(--line); border-radius:999px; padding:6px 14px 6px 8px; font-size:14px;
+  }
+  .chip .dot{width:14px; height:14px; border-radius:50%; background:var(--c); box-shadow:0 0 8px var(--c);}
+  .chip.dead{opacity:.35;}
+  .chip.dead .nm{text-decoration:line-through;}
+  .chip.current{border-color:var(--c); box-shadow:0 0 0 1px var(--c), 0 0 14px -2px var(--c);}
+  .chip .tag{font-size:10px; color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:1px 5px;}
+
+  /* ---------- game ---------- */
+  #screen-game{max-width:1200px;}
+  header{display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap;}
+  .mini-logo{font-weight:800; letter-spacing:2px; font-size:14px; color:var(--dim); margin-right:auto;}
+  #players-bar{display:flex; flex-wrap:wrap; gap:6px;}
+  header .btn{padding:6px 10px; font-size:14px;}
+  #status-line{text-align:center; font-size:16px; font-weight:600; min-height:24px; margin-bottom:10px; font-family:var(--font-display);}
+  #game-main{display:flex; gap:16px; align-items:flex-start;}
+  #board-wrap{flex:1; display:flex; justify-content:center; min-width:0;}
+  #board{
+    display:grid; gap:0; background:var(--board-bg); border-radius:var(--radius-sm); padding:6px;
+    touch-action:manipulation; user-select:none; position:relative;
+  }
+  .cell{
+    position:relative; border:1px solid var(--line); background:var(--cell-bg);
+    display:flex; align-items:center; justify-content:center; transition:background .12s;
+    margin:-1px 0 0 -1px; animation:cellIn .3s ease backwards; --c:#8a8a8a;
+  }
+  .cell.owned{border-color:var(--c); z-index:2;}
+  #board.playable .cell.can{cursor:pointer;
+    background:rgba(120,130,255,.10);
+    box-shadow:inset 0 0 0 1px rgba(120,130,255,.38);
+    background:color-mix(in srgb, var(--turn) 10%, transparent);
+    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--turn) 40%, transparent);}
+  #board.playable .cell.can:hover{background:rgba(120,130,255,.22);
+    background:color-mix(in srgb, var(--turn) 24%, transparent);}
+  .pip{position:absolute; width:44%; height:44%; border-radius:var(--pip-radius); background:var(--c);
+       background-image:
+         radial-gradient(circle at 32% 28%, rgba(255,255,255,.5) 0%, rgba(255,255,255,.2) 15%, transparent 36%),
+         radial-gradient(circle at 50% 55%, transparent 52%, rgba(0,0,0,.16) 84%, rgba(0,0,0,.24) 100%);
+       box-shadow:0 2px 5px rgba(0,0,0,.32), 0 0 6px -2px var(--c);
+       animation:orbFloat 3.2s ease-in-out infinite, orbTumble 5s ease-in-out infinite;}
+  /* rotation cue: a faint arc drifting around the sphere — matte, not glary */
+  .pip::before{
+    content:""; position:absolute; inset:-22%; border-radius:50%;
+    background:conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,.16) 55deg, transparent 115deg);
+    animation:sheenSpin 2.8s linear infinite;
+  }
+  .cell.hot:not(.pop) .pip::before{animation-duration:1.1s;}   /* spin up as the cell nears critical mass */
+  .cell[data-count="1"] .pip:nth-child(1){left:28%; top:28%;}
+  .cell[data-count="2"] .pip:nth-child(1){left:7%; top:7%;}
+  .cell[data-count="2"] .pip:nth-child(2){left:49%; top:49%;}
+  .cell[data-count="3"] .pip:nth-child(1){left:5%; top:7%;}
+  .cell[data-count="3"] .pip:nth-child(2){left:51%; top:7%;}
+  .cell[data-count="3"] .pip:nth-child(3){left:28%; top:49%;}
+  @keyframes pop{0%{transform:scale(.4);}60%{transform:scale(1.25);}100%{transform:scale(1);}}
+  .cell.pop .pip{animation:pop .22s ease;}
+  @keyframes boom{0%{box-shadow:0 0 0 0 var(--c);}100%{box-shadow:0 0 0 22px transparent;}}
+  .cell.boom{animation:boom .3s ease-out;}
+
+  /* ---------- motion & effects ---------- */
+  @keyframes cellIn{from{opacity:0; transform:scale(.5)}to{opacity:1; transform:scale(1)}}
+  @keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3%)}}
+  @keyframes orbTumble{0%,100%{transform:rotate(-9deg)}50%{transform:rotate(9deg)}}
+  @keyframes sheenSpin{to{transform:rotate(360deg)}}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(.7px,-.7px)}50%{transform:translate(-.7px,.7px)}75%{transform:translate(-.7px,-.7px)}}
+  /* keep the rotation from blurring the sphere edges */
+  .pip, .pip::before{will-change:transform;}
+  .cell.hot:not(.pop) .pip{animation:orbFloat 1.6s ease-in-out infinite, orbTumble 2.2s ease-in-out infinite;}
+  .fly-orb{position:absolute; border-radius:var(--pip-radius); background:var(--c);
+    background-image:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.5) 0%, rgba(255,255,255,.2) 15%, transparent 36%),
+      radial-gradient(circle at 50% 55%, transparent 52%, rgba(0,0,0,.16) 84%, rgba(0,0,0,.24) 100%);
+    box-shadow:0 2px 5px rgba(0,0,0,.32), 0 0 6px -2px var(--c);
+    transition:transform .18s cubic-bezier(.5,.05,.6,1); z-index:6; pointer-events:none;}
+  @keyframes cardIn{0%{transform:scale(.72); opacity:0}100%{transform:scale(1); opacity:1}}
+  #end-overlay .card{animation:cardIn .38s cubic-bezier(.2,1.5,.35,1);}
+  body[data-theme="apple"] #end-overlay{background:rgba(245,245,247,.72);}
+  .confetti-wrap{position:fixed; inset:0; pointer-events:none; z-index:100; overflow:hidden;}
+  .confetti-wrap i{position:absolute; top:-4%; display:block; animation:confetti-fall linear forwards;}
+  @keyframes confetti-fall{to{transform:translateY(112vh) rotate(680deg);}}
+  .modal-overlay{position:fixed; inset:0; background:rgba(6,8,18,.7); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; overflow-y:auto;}
+  body[data-theme="apple"] .modal-overlay{background:rgba(245,245,247,.6);}
+  .modal-card{max-width:440px; width:100%; margin:auto; animation:cardIn .3s cubic-bezier(.2,1.4,.4,1);}
+  #howto-list{padding-left:20px; display:flex; flex-direction:column; gap:10px; font-size:14px; line-height:1.45;}
+  #howto-list b{color:var(--accent);}
+  /* ---------- share panel ---------- */
+  #share-invite-text{background:var(--card2); border:1px solid var(--line); border-radius:var(--radius-sm);
+    padding:12px; font-size:14px; line-height:1.5; color:var(--dim); margin-bottom:12px; word-break:break-word;}
+  #share-invite-text b{color:var(--text);}
+  #share-qr{display:flex; justify-content:center; padding:10px 0 4px;}
+  #share-qr canvas, #share-qr img{border-radius:8px; background:#fff; padding:8px;}
+  .share-row{display:flex; gap:8px; margin-top:12px;}
+  .share-row .btn{flex:1;}
+  .hidden-hard{display:none !important;}
+
+  @media (prefers-reduced-motion: reduce){
+    .cell, .cell.hot:not(.pop) .pip, #end-overlay .card, .modal-card, .pip, .pip::before, .pip::after{animation:none !important;}
+    .confetti-wrap{display:none;}
+    .fly-orb{transition:none;}
+  }
+
+  /* ---------- chat ---------- */
+  .chat{
+    width:280px; min-width:240px; background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .chat-head{padding:8px 12px; font-size:12px; color:var(--dim); border-bottom:1px solid var(--line); letter-spacing:1px; user-select:none;}
+  #chat-msgs{height:260px; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:6px; font-size:13px;}
+  #chat-msgs .m{line-height:1.35; word-break:break-word;}
+  #chat-msgs .who{font-weight:700;}
+  #chat-msgs .sys{color:var(--dim); font-style:italic; text-align:center; font-size:12px;}
+  .chat .row{border-top:1px solid var(--line); padding:8px;}
+  .chat input{flex:1; min-width:0;}
+  .chat button{background:var(--accent); border:none; color:#fff; border-radius:var(--btn-radius); padding:0 14px; min-width:44px; min-height:44px;}
+  @media (max-width:760px){
+    .screen{padding:14px 10px 32px; padding-bottom:calc(32px + env(safe-area-inset-bottom));}
+    .logo{margin-top:6px;}
+    .card{padding:14px;}
+    .panel{padding:12px;}
+    header{gap:8px; margin-bottom:6px;}
+    header .btn{padding:6px 8px;}
+    .theme-select{max-width:86px;}
+    .chip{font-size:12px; padding:5px 10px 5px 6px;}
+    #status-line{font-size:14px; margin-bottom:6px; min-height:20px;}
+    .code-box b{font-size:20px; letter-spacing:4px;}
+    body[data-theme="arcade"] .code-box b{font-size:15px;}
+    #end-title{font-size:24px;}
+    /* collapsible chat: tap header to expand/collapse */
+    #game-main{flex-direction:column; gap:10px;}
+    .chat{width:100%; min-width:0;}
+    .chat-head{cursor:pointer; display:flex; justify-content:space-between; align-items:center;}
+    .chat-head::after{content:"▸"; font-size:11px;}
+    #chat.collapsed .chat-head::after{content:"▾";}
+    #chat.collapsed #chat-msgs, #chat.collapsed .row{display:none;}
+    #chat:not(.collapsed) #chat-msgs{height:130px;}
+    /* landscape: use width budget too */
+  }
+  @media (max-height:520px) and (orientation:landscape){
+    #status-line{min-height:18px; font-size:13px;}
+    header{margin-bottom:4px;}
+    .logo{margin-top:0;}
+  }
+
+  /* ---------- end overlay ---------- */
+  #end-overlay{
+    position:fixed; inset:0; background:rgba(6,8,18,.82); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; z-index:50; padding:16px;
+    overflow-y:auto;
+  }
+  #end-overlay .card{text-align:center; min-width:280px; max-width:100%; margin:auto; max-height:100%;}
+  #end-title{font-size:30px; margin-bottom:18px; font-family:var(--font-display);}
+  @media (max-height:520px){
+    #end-title{font-size:22px; margin-bottom:10px;}
+    #end-overlay .card{padding:14px;}
+  }
+  #end-overlay .btn{width:100%; margin-top:10px;}
+  #end-wait{color:var(--dim); margin-top:10px; font-size:14px;}
+
+  #toast{
+    position:fixed; left:50%; bottom:calc(26px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+    background:var(--card2); border:1px solid var(--accent); color:var(--text);
+    padding:10px 18px; border-radius:12px; font-size:14px; opacity:0; pointer-events:none;
+    transition:opacity .25s; z-index:99; max-width:90vw; text-align:center;
+  }
+  #toast.show{opacity:1;}
+</style>
+</head>
+<body data-theme="nothing">
+
+<!-- ============ HOME ============ -->
+<section id="screen-home" class="screen">
+  <h1 class="logo">CHAIN REACTION</h1>
+  <p class="tagline">Place orbs, trigger chain explosions, capture the board. Up to 6 players online.</p>
+  <div class="theme-picker" id="theme-picker">
+    <button class="theme-opt" data-theme-name="nothing"><span class="tp"><i></i><i></i><i></i></span>Nothing</button>
+    <button class="theme-opt" data-theme-name="apple"><span class="tp"><i></i><i></i><i></i></span>Apple</button>
+    <button class="theme-opt" data-theme-name="arcade"><span class="tp"><i></i><i></i><i></i></span>Arcade</button>
+  </div>
+  <div class="card">
+    <label for="inp-name">Your name</label>
+    <input id="inp-name" maxlength="12" placeholder="Player" autocomplete="off">
+    <div class="home-grid">
+      <div class="panel">
+        <h2> Create online room</h2>
+        <p>Host a room and share the 4-letter code with friends.</p>
+        <button id="btn-create" class="btn primary">Create room</button>
+      </div>
+      <div class="panel">
+        <h2>🔑 Join a room</h2>
+        <p>Enter the code your friend shared.</p>
+        <div class="row">
+          <input id="inp-code" maxlength="4" placeholder="CODE" autocomplete="off">
+          <button id="btn-join" class="btn primary" style="width:auto">Join</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>👥 Local game</h2>
+        <p>Pass &amp; play on this device.</p>
+        <div class="row">
+          <select id="sel-local-players" title="Players">
+            <option value="2">2 players</option><option value="3">3 players</option>
+            <option value="4">4 players</option><option value="5">5 players</option>
+            <option value="6">6 players</option>
+          </select>
+          <select id="sel-local-grid" title="Grid size">
+            <option value="classic">9×6</option><option value="large">12×8</option>
+            <option value="xl">14×10</option>
+          </select>
+          <button id="btn-local" class="btn" style="width:auto">Start</button>
+        </div>
+      </div>
+    </div>
+    <button id="btn-howto" class="btn ghost" style="width:100%; margin-top:14px">📖 How to play</button>
+  </div>
+</section>
+
+<!-- ============ LOBBY ============ -->
+<section id="screen-lobby" class="screen hidden">
+  <h1 class="logo2">Room lobby</h1>
+  <div class="card">
+    <div class="code-box">Room code <b id="lobby-code">····</b>
+      <button id="btn-copy" class="btn">Copy</button>
+      <button id="btn-share" class="btn primary">Share</button>
+    </div>
+    <div id="lobby-players"></div>
+    <div class="row" style="justify-content:center">
+      <label style="margin:0">Grid size</label>
+      <select id="sel-lobby-grid" style="width:auto">
+        <option value="classic">Classic 9×6</option><option value="large">Large 12×8</option>
+        <option value="xl">XL 14×10</option>
+      </select>
+      <label style="margin:0">Theme</label>
+      <select id="sel-lobby-theme" class="theme-select" style="width:auto">
+        <option value="nothing">Nothing</option><option value="apple">Apple</option><option value="arcade">Arcade</option>
+      </select>
+    </div>
+    <button id="btn-start" class="btn primary">Start game</button>
+    <p id="lobby-hint"></p>
+    <button id="btn-leave-lobby" class="btn ghost">Leave room</button>
+  </div>
+  <div id="lobby-chat-slot" style="max-width:560px; margin:16px auto 0;"></div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="screen-game" class="screen hidden">
+  <header>
+    <span class="mini-logo">CHAIN REACTION</span>
+    <div id="players-bar"></div>
+    <select id="sel-game-theme" class="theme-select" style="width:auto" title="Theme">
+      <option value="nothing">Nothing</option><option value="apple">Apple</option><option value="arcade">Arcade</option>
+    </select>
+    <button id="btn-mute" class="btn" title="Sound on/off">🔊</button>
+    <button id="btn-leave-game" class="btn" title="Leave game">✕</button>
+  </header>
+  <div id="status-line" aria-live="polite">&nbsp;</div>
+  <div id="game-main">
+    <div id="board-wrap"><div id="board"></div></div>
+    <div id="game-chat-slot"></div>
+  </div>
+  <div id="end-overlay" class="hidden">
+    <div class="card">
+      <h1 id="end-title"></h1>
+      <button id="btn-again" class="btn primary">Play again</button>
+      <p id="end-wait" class="hidden">Waiting for the host to start a new game…</p>
+      <button id="btn-share-end" class="btn">📣 Invite friends</button>
+      <button id="btn-menu" class="btn ghost">Main menu</button>
+    </div>
+  </div>
+</section>
+
+<!-- chat component (moved between lobby and game by JS) -->
+<div id="chat" class="chat hidden">
+  <div class="chat-head" id="chat-head">CHAT</div>
+  <div id="chat-msgs"></div>
+  <div class="row">
+    <input id="chat-inp" maxlength="140" placeholder="Type a message…" autocomplete="off">
+    <button id="chat-send">➤</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="howto" class="modal-overlay hidden">
+  <div class="card modal-card">
+    <h2 style="margin-bottom:14px; font-family:var(--font-display)">How to play</h2>
+    <ol id="howto-list">
+      <li>Players take turns placing one orb in an <b>empty cell</b> or on <b>their own</b> orbs.</li>
+      <li>Every cell has a <b>critical mass</b> — the number of cells touching it: corners <b>2</b>, edges <b>3</b>, middle <b>4</b>.</li>
+      <li>When a cell reaches critical mass it <b>explodes</b>, flinging an orb into each neighbor and <b>capturing</b> them.</li>
+      <li>Explosions <b>chain</b> — one good move can flip half the board.</li>
+      <li>Lose all your orbs and you're <b>eliminated</b>. Last color standing <b>wins</b>!</li>
+    </ol>
+    <button id="btn-close-howto" class="btn primary" style="width:100%; margin-top:16px">Got it!</button>
+  </div>
+</div>
+
+<div id="share" class="modal-overlay hidden">
+  <div class="card modal-card">
+    <h2 style="margin-bottom:12px; font-family:var(--font-display)">Invite your friends</h2>
+    <div id="share-invite-text"></div>
+    <div id="share-qr"></div>
+    <div class="share-row">
+      <button id="btn-share-copy" class="btn">Copy link</button>
+      <button id="btn-share-native" class="btn primary">Share…</button>
+    </div>
+    <button id="btn-close-share" class="btn ghost" style="width:100%; margin-top:10px">Close</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   CHAIN REACTION — online (PeerJS / WebRTC) + local pass-and-play
+   Host-authoritative star topology: one browser hosts the room, other
+   players connect with a room code. All game logic runs on the host;
+   clients render the step stream. Chat is relayed by the host.
+   ===================================================================== */
+
+// ---------------- constants ----------------
+const PEER_PREFIX  = 'crgx7-';            // peer-id namespace to avoid collisions
+const CODE_CHARS   = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const MAX_PLAYERS  = 6;
+const STEP_MS      = 280;                 // animation delay between explosion steps
+const PLAYER_COLORS = ['#ff5252','#40a0ff','#4caf50','#ffd740','#ab47bc','#ff9800'];
+const PLAYER_NAMES  = ['Red','Blue','Green','Yellow','Purple','Orange'];
+const GRID_SIZES = {
+  classic: {rows: 9,  cols: 6,  label: 'Classic 9×6'},
+  large:   {rows: 12, cols: 8,  label: 'Large 12×8'},
+  xl:      {rows: 14, cols: 10, label: 'XL 14×10'},
+};
+
+// ---------------- tiny helpers ----------------
+const $ = id => document.getElementById(id);
+function showScreen(name){
+  for(const s of ['home','lobby','game']) $('screen-'+s).classList.toggle('hidden', s!==name);
+  window.scrollTo(0,0);
+}
+let toastTimer=null;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), 3200);
+}
+function setBusy(btn, busy, busyText){
+  if(busy){ btn.dataset.label=btn.textContent; btn.textContent=busyText; btn.disabled=true; }
+  else{ btn.textContent=btn.dataset.label||btn.textContent; btn.disabled=false; }
+}
+function genCode(){ let s=''; for(let i=0;i<4;i++) s+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)]; return s; }
+
+// ---------------- sound ----------------
+let audioCtx=null, muted=localStorage.getItem('crg-muted')==='1';
+function beep(freq, dur, vol=0.14, type='sine'){
+  if(muted) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    const t=audioCtx.currentTime, o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+dur);
+  }catch(e){/* audio not available */}
+}
+
+// =====================================================================
+//  GAME ENGINE (pure functions — shared by host and local mode)
+// =====================================================================
+function neighborsOf(idx, rows, cols){
+  const r=Math.floor(idx/cols), c=idx%cols, out=[];
+  if(r>0) out.push(idx-cols);
+  if(r<rows-1) out.push(idx+cols);
+  if(c>0) out.push(idx-1);
+  if(c<cols-1) out.push(idx+1);
+  return out;
+}
+const criticalMass = (idx,rows,cols) => neighborsOf(idx,rows,cols).length;
+
+/* Applies a placement + all resulting explosions.
+   Returns {steps, owner, count}. Each step is a list of {cell, owner, count}
+   changes, in the order they should be animated. */
+function buildMoveSteps(owner, count, rows, cols, cell, p){
+  owner=owner.slice(); count=count.slice();
+  const steps=[];
+  owner[cell]=p; count[cell]+=1;
+  steps.push([{cell, owner:p, count:count[cell]}]);
+  const queue=[cell]; let guard=0;
+  while(queue.length && guard++<6000){
+    const c=queue.shift();
+    const crit=criticalMass(c,rows,cols);
+    if(count[c]<crit) continue;
+    count[c]-=crit;
+    if(count[c]===0) owner[c]=-1;
+    const step=[{cell:c, owner:owner[c], count:count[c]}];
+    for(const n of neighborsOf(c,rows,cols)){
+      owner[n]=p; count[n]+=1;
+      step.push({cell:n, owner:p, count:count[n]});
+      if(count[n]>=criticalMass(n,rows,cols)) queue.push(n);
+    }
+    steps.push(step);
+  }
+  return {steps, owner, count};
+}
+function cellsPerPlayer(owner, n){
+  const arr=new Array(n).fill(0);
+  for(const o of owner) if(o>=0) arr[o]++;
+  return arr;
+}
+function nextAlive(G, from){
+  for(let k=1;k<=G.players.length;k++){
+    const i=(from+k)%G.players.length;
+    if(G.players[i].alive && !G.players[i].left) return i;
+  }
+  return -1;
+}
+
+/* Core move processing. G = game state, emit = function(msg) that delivers
+   protocol messages (host broadcast, or direct UI dispatch in local mode). */
+function coreMove(G, idx, cell, emit){
+  if(G.phase!=='playing') return;
+  if(idx!==G.turn) return;
+  if(cell<0 || cell>=G.rows*G.cols) return;
+  if(G.owner[cell]!==-1 && G.owner[cell]!==idx) return;
+
+  const p=G.players[idx]; p.hasPlayed=true;
+  const r=buildMoveSteps(G.owner, G.count, G.rows, G.cols, cell, idx);
+  G.owner=r.owner; G.count=r.count;
+  for(const s of r.steps) emit({t:'step', changes:s});
+  resolveEliminations(G, emit);
+  if(G.phase==='playing'){
+    G.turn=nextAlive(G, G.turn);
+    emit({t:'turn', idx:G.turn});
+  }
+}
+function resolveEliminations(G, emit){
+  const counts=cellsPerPlayer(G.owner, G.players.length);
+  G.players.forEach((pl,i)=>{
+    if(pl.alive && pl.hasPlayed && counts[i]===0){
+      pl.alive=false;
+      emit({t:'elim', idx:i});
+      emit({t:'chat', sys:true, text:pl.name+' was eliminated!'});
+    }
+  });
+  const aliveIdxs=G.players.map((pl,i)=>pl.alive&&!pl.left?i:-1).filter(i=>i>=0);
+  if(aliveIdxs.length<=1){
+    G.phase='ended';
+    emit({t:'end', winner:aliveIdxs.length===1?aliveIdxs[0]:null});
+  }
+}
+function coreStart(G, emit){
+  G.phase='playing';
+  const {rows, cols}=GRID_SIZES[G.gridKey];
+  G.rows=rows; G.cols=cols;
+  G.owner=new Array(rows*cols).fill(-1);
+  G.count=new Array(rows*cols).fill(0);
+  G.players.forEach(p=>{p.alive=true; p.hasPlayed=false;});
+  G.turn=Math.floor(Math.random()*G.players.length);
+  emit({t:'start', rows, cols, players:publicPlayers(G), turn:G.turn});
+}
+const publicPlayers = G => G.players.map((p,i)=>({id:p.id, name:p.name, color:i}));
+
+// =====================================================================
+//  CLIENT-SIDE APP STATE + UI
+// =====================================================================
+const App = {
+  mode:'online',          // 'online' | 'local'
+  isHost:false,
+  myId:null, myName:'',
+  phase:'home',           // 'lobby' | 'playing' | 'ended'
+  players:[],             // {id,name,color,alive,left}
+  rows:0, cols:0, owner:[], count:[],
+  turn:0, acceptingMoves:false,
+};
+const myIdx = () => App.players.findIndex(p=>p.id===App.myId);
+
+// ---- animation queue: step messages animate; control messages are instant ----
+let uiQueue=[], uiBusy=false, cascadeDepth=0, pendingTimers=[];
+function later(fn, ms){
+  const id=setTimeout(()=>{ pendingTimers=pendingTimers.filter(t=>t!==id); fn(); }, ms);
+  pendingTimers.push(id); return id;
+}
+function enqueue(fn, wait=0){ uiQueue.push({fn, wait}); pumpQueue(); }
+function pumpQueue(){
+  if(uiBusy || !uiQueue.length) return;
+  uiBusy=true;
+  const item=uiQueue.shift(); item.fn();
+  later(()=>{uiBusy=false; pumpQueue();}, item.wait);   // tracked so clearQueue can kill a stale pump
+}
+function clearQueue(){
+  uiQueue=[]; uiBusy=false; cascadeDepth=0;
+  pendingTimers.forEach(clearTimeout); pendingTimers=[];
+}
+
+// ---- message dispatcher (used by network clients AND the host itself) ----
+function uiDispatch(msg){
+  switch(msg.t){
+    case 'welcome':
+      App.myId=msg.id;
+      Net.joined=true; clearTimeout(Net.joinTimer);
+      setBusy($('btn-join'), false);
+      break;
+    case 'lobby':
+      clearQueue();
+      App.phase='lobby';
+      App.players=msg.players.map(p=>({...p, alive:true, left:false}));
+      if(msg.code) Net.code=msg.code;
+      renderLobby(msg.gridKey);
+      showScreen('lobby');
+      break;
+    case 'start':
+      clearQueue();
+      cascadeDepth=0;
+      App.phase='playing';
+      App.players=msg.players.map(p=>({...p, alive:true, left:false}));
+      App.rows=msg.rows; App.cols=msg.cols;
+      App.owner=new Array(msg.rows*msg.cols).fill(-1);
+      App.count=new Array(msg.rows*msg.cols).fill(0);
+      App.turn=msg.turn; App.acceptingMoves=true;
+      $('end-overlay').classList.add('hidden');
+      buildBoard(); renderAllCells(); renderPlayersBar(); renderStatus();
+      mountChat($('game-chat-slot'));
+      showScreen('game');
+      sizeBoard();   // recompute now that the game screen is visible and measurable
+      break;
+    case 'step': {
+      // explosions accelerate as the cascade grows; depth is captured at dispatch
+      // time so pacing AND sound pitch escalate together
+      const depth=cascadeDepth;
+      const wait=Math.max(110, STEP_MS - depth*26);
+      enqueue(()=>applyStepUI(msg.changes, depth), wait);
+      cascadeDepth++;
+      break;
+    }
+    case 'state':                       // full re-sync (e.g. after a player leaves)
+      enqueue(()=>{ App.owner=msg.owner.slice(); App.count=msg.count.slice(); renderAllCells(); });
+      break;
+    case 'turn':
+      enqueue(()=>{ cascadeDepth=0; App.turn=msg.idx; App.acceptingMoves=true; renderPlayersBar(); renderStatus(); });
+      break;
+    case 'elim':
+      enqueue(()=>{ App.players[msg.idx].alive=false; renderPlayersBar(); renderStatus(); });
+      break;
+    case 'end':
+      enqueue(()=>{ App.phase='ended'; App.acceptingMoves=false; showEnd(msg.winner); });
+      break;
+    case 'chat':
+      if(msg.sys) enqueue(()=>addChatMsg(msg));  // keep system messages in sync with the animation timeline
+      else addChatMsg(msg);
+      break;
+    case 'err':
+      setBusy($('btn-join'), false);
+      clearTimeout(Net.joinTimer);
+      Net.intentionalLeave=true;             // don't clobber a specific error with a generic disconnect toast
+      toast(msg.msg); break;
+  }
+}
+
+// ---------------- board rendering ----------------
+function buildBoard(){
+  const board=$('board');
+  board.innerHTML='';
+  for(let i=0;i<App.rows*App.cols;i++){
+    const d=document.createElement('div');
+    d.className='cell';
+    d.style.animationDelay=((Math.floor(i/App.cols)+(i%App.cols))*14)+'ms';
+    d.tabIndex=0;
+    d.addEventListener('click', ()=>submitMove(i));
+    d.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); submitMove(i); }});
+    board.appendChild(d);
+  }
+  sizeBoard();
+}
+function sizeBoard(){
+  if(!App.rows) return;
+  const stacked=window.innerWidth<=760;                       // chat drops below the board on small screens
+  const chatW = (stacked || $('chat').classList.contains('hidden')) ? 0 : 316;  // panel + gap
+  const maxW = Math.min($('game-main').clientWidth - chatW - 24, window.innerWidth - 40);
+  let maxH;
+  if(stacked){
+    maxH = Math.max(window.innerHeight - 150, window.innerWidth - 40);  // landscape: width is the real budget
+  }else{
+    maxH = Math.min(window.innerHeight - 160, 760);           // desktop: use the height, capped for huge monitors
+  }
+  const area = App.rows*App.cols;
+  const minCell = stacked ? (area>100 ? 26 : 30) : (area>100 ? 34 : 40);
+  let cell = Math.floor(Math.min(maxW/App.cols, maxH/App.rows));
+  // bound to a comfortable range, but never so big the board overflows the screen
+  cell = Math.min(cell, stacked ? 56 : 76);
+  cell = Math.max(cell, minCell);
+  const board=$('board');
+  board.style.gridTemplateColumns=`repeat(${App.cols}, ${cell}px)`;
+  board.style.gridTemplateRows=`repeat(${App.rows}, ${cell}px)`;
+  board.style.width=(cell*App.cols)+'px';    // pin the grid so it can't be stretched/shrunk by flex
+  board.style.height=(cell*App.rows)+'px';
+  board.style.flex='none';
+}
+window.addEventListener('resize', sizeBoard);
+if(window.visualViewport) visualViewport.addEventListener('resize', sizeBoard);  // mobile keyboard / URL-bar collapse
+
+function renderCell(i, animate){
+  const cell=$('board').children[i];
+  if(!cell) return;
+  const o=App.owner[i], c=App.count[i];
+  cell.classList.toggle('owned', o>=0);
+  cell.dataset.count=Math.min(c,3);
+  cell.classList.toggle('hot', o>=0 && c===criticalMass(i,App.rows,App.cols)-1);  // one orb from exploding
+  cell.setAttribute('role','button');
+  cell.setAttribute('aria-label', o>=0 ? `${App.players[o].name}: ${c} orb${c>1?'s':''}` : 'empty cell');
+  cell.innerHTML='';
+  if(o>=0){
+    cell.style.setProperty('--c', PLAYER_COLORS[App.players[o].color]);
+    for(let k=0;k<Math.min(c,3);k++){
+      const pip=document.createElement('div'); pip.className='pip'; cell.appendChild(pip);
+    }
+  }
+  if(animate){
+    cell.classList.remove('pop','boom'); void cell.offsetWidth;
+    cell.classList.add(c===0||App.owner[i]===-1 ? 'boom' : 'pop');
+    later(()=>cell.classList.remove('pop','boom'), 380);   // let hot cells resume shaking afterwards
+  }
+  updatePlayable();
+}
+function renderAllCells(){ for(let i=0;i<App.owner.length;i++) renderCell(i,false); updatePlayable(); }
+
+function applyStepUI(changes, depth=0){
+  for(const ch of changes){ App.owner[ch.cell]=ch.owner; App.count[ch.cell]=ch.count; }
+  if(changes.length>1){
+    // explosion: clear the source cell, then fling orbs into each neighbor
+    const src=changes[0], p=changes[1].owner;
+    renderCell(src.cell,true);
+    changes.slice(1).forEach((ch,i)=>later(()=>flyOrb(src.cell, ch.cell, p, ()=>renderCell(ch.cell,true)), i*35));
+    beep(Math.min(430, 150+depth*26), 0.2, 0.14, 'triangle');
+  }else{
+    renderCell(changes[0].cell,true);
+    beep(440, 0.07);
+  }
+}
+function flyOrb(fromCell, toCell, playerIdx, done){
+  const board=$('board'), a=board.children[fromCell], b=board.children[toCell];
+  if(!a || !b || playerIdx<0){ done(); return; }
+  const size=Math.max(8, Math.round(a.clientWidth*0.44));
+  const orb=document.createElement('div');
+  orb.className='fly-orb';
+  orb.style.width=orb.style.height=size+'px';
+  orb.style.setProperty('--c', PLAYER_COLORS[App.players[playerIdx].color]);
+  const ax=a.offsetLeft+a.clientWidth/2, ay=a.offsetTop+a.clientHeight/2;
+  orb.style.left=(ax-size/2)+'px'; orb.style.top=(ay-size/2)+'px';
+  board.appendChild(orb);
+  const dx=(b.offsetLeft+b.clientWidth/2)-ax, dy=(b.offsetTop+b.clientHeight/2)-ay;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ orb.style.transform=`translate(${dx}px,${dy}px)`; }));
+  later(()=>{ orb.remove(); done(); }, 190);
+}
+
+function updatePlayable(){
+  const myTurn = App.phase==='playing' && App.acceptingMoves &&
+                 (App.mode==='local' || App.turn===myIdx());
+  const board=$('board');
+  board.classList.toggle('playable', myTurn);
+  if(myTurn && App.players[App.turn]) board.style.setProperty('--turn', PLAYER_COLORS[App.players[App.turn].color]);
+  for(let i=0;i<App.owner.length;i++){
+    board.children[i].classList.toggle('can', myTurn && (App.owner[i]===-1 || App.owner[i]===App.turn));
+  }
+}
+
+function renderPlayersBar(){
+  const bar=$('players-bar'); bar.innerHTML='';
+  App.players.forEach((p,i)=>{
+    const chip=document.createElement('div');
+    chip.className='chip'+(i===App.turn&&App.phase==='playing'?' current':'')+(!p.alive?' dead':'');
+    chip.style.setProperty('--c', PLAYER_COLORS[p.color]);
+    const dot=document.createElement('span'); dot.className='dot';
+    const nm=document.createElement('span'); nm.className='nm'; nm.textContent=p.name;
+    chip.append(dot,nm);
+    if(App.mode==='online' && p.id===App.myId){
+      const tag=document.createElement('span'); tag.className='tag'; tag.textContent='YOU'; chip.appendChild(tag);
+    }
+    bar.appendChild(chip);
+  });
+}
+function renderStatus(){
+  const el=$('status-line');
+  if(App.phase!=='playing'){ el.innerHTML='&nbsp;'; return; }
+  const p=App.players[App.turn];
+  const mine = App.mode==='local' || App.turn===myIdx();
+  el.textContent = mine ? (App.mode==='local' ? `${p.name}'s turn` : "Your turn — tap a cell!")
+                        : `${p.name}'s turn…`;
+  el.style.color = PLAYER_COLORS[p.color];
+  updatePlayable();
+}
+
+// ---------------- chat ----------------
+function mountChat(slot){
+  const chat=$('chat');
+  if(App.mode==='online'){ chat.classList.remove('hidden'); slot.appendChild(chat); }
+  else chat.classList.add('hidden');
+  chat.classList.toggle('collapsed', window.innerWidth<=760);   // collapsed by default on small screens
+  sizeBoard();
+}
+function addChatMsg(msg){
+  const box=$('chat-msgs');
+  const div=document.createElement('div');
+  if(msg.sys){
+    div.className='sys'; div.textContent=msg.text;
+  }else{
+    div.className='m';
+    const who=document.createElement('span'); who.className='who';
+    who.textContent=msg.name+': '; who.style.color=PLAYER_COLORS[msg.color];
+    div.append(who, document.createTextNode(msg.text));
+  }
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+function sendChat(){
+  const inp=$('chat-inp'), text=inp.value.trim();
+  if(!text) return;
+  inp.value='';
+  if(App.mode!=='online') return;
+  if(App.isHost) hostHandleChat(App.myId, text);
+  else if(Net.conn && Net.conn.open) Net.conn.send({t:'chat', text});
+}
+$('chat-send').addEventListener('click', sendChat);
+$('chat-inp').addEventListener('keydown', e=>{ if(e.key==='Enter') sendChat(); });
+$('chat-head').addEventListener('click', ()=>{
+  if(window.innerWidth<=760) $('chat').classList.toggle('collapsed');
+});
+
+// ---------------- lobby ----------------
+function renderLobby(gridKey){
+  $('lobby-code').textContent = Net.code || '—';
+  const list=$('lobby-players'); list.innerHTML='';
+  App.players.forEach(p=>{
+    const chip=document.createElement('div');
+    chip.className='chip'; chip.style.setProperty('--c', PLAYER_COLORS[p.color]);
+    const dot=document.createElement('span'); dot.className='dot';
+    const nm=document.createElement('span'); nm.textContent=p.name;
+    chip.append(dot,nm);
+    if(p.id===App.myId){ const t=document.createElement('span'); t.className='tag'; t.textContent='YOU'; chip.appendChild(t); }
+    if(p.id==='host'){ const t=document.createElement('span'); t.className='tag'; t.textContent='HOST'; chip.appendChild(t); }
+    list.appendChild(chip);
+  });
+  const sel=$('sel-lobby-grid');
+  sel.value=gridKey; sel.disabled=!App.isHost;
+  $('btn-start').classList.toggle('hidden', !App.isHost);
+  $('btn-start').disabled = App.players.length<2;
+  $('lobby-hint').textContent = App.isHost
+    ? `${App.players.length}/${MAX_PLAYERS} players — share the code, then start when ready.`
+    : 'Waiting for the host to start the game…';
+  mountChat($('lobby-chat-slot'));
+}
+
+// ---------------- end overlay ----------------
+function showEnd(winnerIdx){
+  const overlay=$('end-overlay');
+  overlay.classList.remove('hidden');
+  const title=$('end-title');
+  if(winnerIdx===null || winnerIdx===undefined){
+    title.textContent='Game over'; title.style.color='var(--text)';
+  }else{
+    const w=App.players[winnerIdx];
+    const iWon = App.mode==='online' && w.id===App.myId;
+    title.textContent = App.mode==='local' ? `${w.name} wins! 🏆` : (iWon ? 'You win! 🏆' : `${w.name} wins!`);
+    title.style.color = PLAYER_COLORS[w.color];
+  }
+  const canAgain = App.mode==='local' || App.isHost;
+  $('btn-again').classList.toggle('hidden', !canAgain);
+  $('end-wait').classList.toggle('hidden', canAgain);
+  $('btn-share-end').classList.toggle('hidden', App.mode!=='online');  // invite only makes sense online
+  renderStatus(); updatePlayable();
+  if(winnerIdx!==null && winnerIdx!==undefined){
+    launchConfetti(PLAYER_COLORS[App.players[winnerIdx].color]);
+    beep(523,.14); later(()=>beep(659,.14),130);
+    later(()=>beep(784,.14),260); later(()=>beep(1046,.35),390);
+  }else{
+    beep(330,.3);
+  }
+}
+function launchConfetti(color){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const wrap=document.createElement('div');
+  wrap.className='confetti-wrap';
+  const colors=[color,'#ffd740','#ffffff','#04d9ff'];
+  for(let i=0;i<90;i++){
+    const p=document.createElement('i');
+    const size=5+Math.random()*8;
+    p.style.cssText=`left:${Math.random()*100}%;width:${size}px;height:${Math.max(4,size*0.55)}px;`+
+      `background:${colors[i%colors.length]};animation-delay:${(Math.random()*0.7).toFixed(2)}s;`+
+      `animation-duration:${(2+Math.random()*1.6).toFixed(2)}s`;
+    if(Math.random()<.5) p.style.borderRadius='50%';
+    wrap.appendChild(p);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(()=>wrap.remove(), 5000);
+}
+
+// =====================================================================
+//  NETWORK — HOST
+// =====================================================================
+const Net = { peer:null, conn:null, conns:new Map(), code:null, intentionalLeave:false };
+let H=null;   // host game state
+
+function hostBroadcast(msg){
+  uiDispatch(msg);                       // host renders through the same pipeline
+  for(const c of Net.conns.values()) if(c.open) c.send(msg);
+}
+const sysChat = text => hostBroadcast({t:'chat', sys:true, text});
+const lobbyMsg = () => ({t:'lobby', players:publicPlayers(H), gridKey:H.gridKey, code:Net.code});
+
+function createRoom(){
+  if(Net.peer) return;                       // already connecting or in a room
+  App.myName = $('inp-name').value.trim() || 'Host';
+  Net.code = genCode();
+  App.mode='online'; App.isHost=true; App.myId='host'; Net.intentionalLeave=false;
+  setBusy($('btn-create'), true, 'Connecting…');
+  Net.peer = new Peer(PEER_PREFIX + Net.code);
+
+  Net.peer.on('open', ()=>{
+    setBusy($('btn-create'), false);
+    H = {phase:'lobby', gridKey:'classic', players:[{id:'host', name:App.myName, color:0, alive:true, hasPlayed:false, left:false}]};
+    uiDispatch(lobbyMsg());
+    sysChat(App.myName+' created the room');
+    try{ history.replaceState(null,'','#'+Net.code); }catch(e){}
+  });
+  Net.peer.on('connection', conn=>{
+    conn.on('data', d=>hostOnMessage(conn, d));
+    conn.on('close', ()=>hostOnLeave(conn));
+    conn.on('error', ()=>hostOnLeave(conn));
+  });
+  Net.peer.on('error', e=>{
+    if(e.type==='unavailable-id'){           // rare code collision → retry with new code
+      Net.peer.destroy(); Net.peer=null; createRoom();
+    }else{                                   // fatal cloud/socket error → recover, don't brick the button
+      try{ Net.peer.destroy(); }catch(e2){}
+      Net.peer=null;
+      setBusy($('btn-create'), false);
+      toast('Network error: '+e.type+' — try again.');
+    }
+  });
+}
+
+function hostOnMessage(conn, d){
+  if(!d || !d.t) return;
+  if(d.t==='join'){
+    if(H.phase!=='lobby'){ conn.send({t:'err', msg:'That game has already started.'}); setTimeout(()=>conn.close(),800); return; }
+    if(H.players.length>=MAX_PLAYERS){ conn.send({t:'err', msg:'Room is full (6 players).'}); setTimeout(()=>conn.close(),800); return; }
+    const name=(String(d.name||'Player').slice(0,12))||'Player';
+    const player={id:conn.peer, name, color:H.players.length, alive:true, hasPlayed:false, left:false};
+    H.players.push(player);
+    Net.conns.set(conn.peer, conn);
+    conn.send({t:'welcome', id:conn.peer});
+    hostBroadcast(lobbyMsg());
+    sysChat(name+' joined the room');
+  }
+  else if(d.t==='move'){
+    const idx=H.players.findIndex(p=>p.id===conn.peer);
+    if(idx>=0) coreMove(H, idx, d.cell|0, hostBroadcast);
+  }
+  else if(d.t==='chat'){ hostHandleChat(conn.peer, d.text); }
+}
+function hostHandleChat(fromId, text){
+  text=String(text||'').slice(0,140).trim();
+  if(!text) return;
+  const idx=H.players.findIndex(p=>p.id===fromId);
+  if(idx<0) return;
+  hostBroadcast({t:'chat', name:H.players[idx].name, color:H.players[idx].color, text});
+}
+function hostOnLeave(conn){
+  const idx=H.players.findIndex(p=>p.id===conn.peer);
+  Net.conns.delete(conn.peer);
+  if(idx<0) return;
+  const pl=H.players[idx];
+  if(H.phase==='lobby'){
+    H.players.splice(idx,1);
+    H.players.forEach((p,i)=>p.color=i);   // re-pack colors
+    hostBroadcast(lobbyMsg());
+  }else{
+    pl.left=true;
+    sysChat(pl.name+' left the game');
+    if(H.phase==='playing' && pl.alive){
+      pl.alive=false;
+      H.owner=H.owner.map(o=>o===idx?-1:o);
+      H.count=H.count.map((c,i)=>H.owner[i]===-1?0:c);
+      hostBroadcast({t:'state', owner:H.owner, count:H.count});
+      hostBroadcast({t:'elim', idx});
+      if(H.turn===idx){
+        const nxt=nextAlive(H, idx);
+        if(nxt>=0){ H.turn=nxt; hostBroadcast({t:'turn', idx:H.turn}); }
+      }
+      resolveEliminationsAfterLeave();
+    }else if(H.phase==='ended'){ /* nothing to do */ }
+  }
+}
+function resolveEliminationsAfterLeave(){
+  const aliveIdxs=H.players.map((p,i)=>p.alive&&!p.left?i:-1).filter(i=>i>=0);
+  if(H.phase==='playing' && aliveIdxs.length<=1){
+    H.phase='ended';
+    hostBroadcast({t:'end', winner:aliveIdxs.length===1?aliveIdxs[0]:null});
+  }
+}
+
+// =====================================================================
+//  NETWORK — GUEST
+// =====================================================================
+function joinRoom(){
+  if(Net.peer) return;                       // already connecting or in a room
+  App.myName=$('inp-name').value.trim()||'Player';
+  const code=$('inp-code').value.trim().toUpperCase();
+  if(code.length!==4){ toast('Enter the 4-character room code.'); return; }
+  App.mode='online'; App.isHost=false; Net.intentionalLeave=false;
+  Net.code=code;
+  setBusy($('btn-join'), true, 'Joining…');
+  Net.peer=new Peer();
+  Net.joined=false;
+  Net.joinTimer=setTimeout(()=>{                       // give up if the host never answers
+    if(!Net.joined){ toast('Could not reach the host — check the code and try again.'); cleanupAndHome(); }
+  }, 8000);
+  Net.peer.on('open', ()=>{
+    const conn=Net.peer.connect(PEER_PREFIX+code, {reliable:true});
+    Net.conn=conn;
+    conn.on('open', ()=>conn.send({t:'join', name:App.myName}));
+    conn.on('data', uiDispatch);
+    conn.on('close', ()=>{
+      if(!Net.intentionalLeave) toast('Disconnected from the host.');
+      cleanupAndHome();
+    });
+  });
+  Net.peer.on('error', e=>{
+    setBusy($('btn-join'), false);
+    if(e.type==='peer-unavailable'){ toast('Room not found — check the code.'); cleanupAndHome(); }
+    else{ toast('Network error: '+e.type+' — try again.'); cleanupAndHome(); }
+  });
+}
+
+// =====================================================================
+//  LOCAL PASS-AND-PLAY
+// =====================================================================
+let L=null;
+function startLocalGame(){
+  const n=parseInt($('sel-local-players').value,10);
+  L={phase:'lobby', gridKey:$('sel-local-grid').value, players:[]};
+  for(let i=0;i<n;i++) L.players.push({id:'p'+i, name:PLAYER_NAMES[i], color:i, alive:true, hasPlayed:false, left:false});
+  App.mode='local'; App.isHost=false; App.myId=null;
+  coreStart(L, uiDispatch);
+}
+
+// =====================================================================
+//  MOVE SUBMISSION (shared entry point from board clicks)
+// =====================================================================
+function submitMove(cell){
+  if(App.phase!=='playing' || !App.acceptingMoves) return;
+  if(App.owner[cell]!==-1 && App.owner[cell]!==App.turn) return;
+  if(App.mode==='local'){
+    App.acceptingMoves=false; renderStatus();
+    if(navigator.vibrate) navigator.vibrate(10);       // haptic only on a move that's accepted
+    coreMove(L, App.turn, cell, uiDispatch);
+  }else if(App.isHost){
+    if(App.turn!==myIdx()) return;           // host can only play their own turn online
+    App.acceptingMoves=false; renderStatus();
+    if(navigator.vibrate) navigator.vibrate(10);
+    coreMove(H, App.turn, cell, hostBroadcast);
+  }else{
+    if(App.turn!==myIdx()) return;
+    App.acceptingMoves=false; renderStatus();
+    if(navigator.vibrate) navigator.vibrate(10);
+    Net.conn.send({t:'move', cell});
+  }
+}
+
+// =====================================================================
+//  NAVIGATION / CLEANUP
+// =====================================================================
+function cleanupAndHome(){
+  clearQueue();
+  Net.intentionalLeave=true;
+  clearTimeout(Net.joinTimer); Net.joined=false;
+  try{ if(Net.peer) Net.peer.destroy(); }catch(e){}
+  Net.peer=null; Net.conn=null; Net.conns=new Map(); Net.code=null;
+  H=null; L=null;
+  App.phase='home'; App.players=[]; App.owner=[]; App.count=[];
+  setBusy($('btn-create'), false); setBusy($('btn-join'), false);
+  $('end-overlay').classList.add('hidden');
+  $('chat').classList.add('hidden'); $('chat-msgs').innerHTML='';
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  showScreen('home');
+}
+
+// ---------------- wire up buttons ----------------
+$('btn-create').addEventListener('click', createRoom);
+$('btn-join').addEventListener('click', joinRoom);
+$('inp-code').addEventListener('keydown', e=>{ if(e.key==='Enter') joinRoom(); });
+$('btn-local').addEventListener('click', startLocalGame);
+
+$('btn-copy').addEventListener('click', ()=>{
+  copyText(inviteLink()).then(ok=>toast(ok ? 'Invite link copied!' : 'Copy this link: '+inviteLink()));
+});
+function inviteLink(){
+  return location.href.split('#')[0]+'#'+($('lobby-code').textContent||Net.code||'');
+}
+function inviteText(){
+  return `Join my Chain Reaction game! 💥\nRoom code: ${$('lobby-code').textContent}\n${inviteLink()}`;
+}
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText)
+    return navigator.clipboard.writeText(text).then(()=>true).catch(()=>false);
+  const ta=document.createElement('textarea');         // fallback for file:// and older browsers
+  ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  let ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  return Promise.resolve(ok);
+}
+// ---------- share panel ----------
+function openShare(){
+  const code=$('lobby-code').textContent;
+  $('share-invite-text').innerHTML='';
+  const t=document.createElement('span');
+  t.innerHTML=`Chain Reaction — play with me! 💥<br>Room code: <b>${code}</b><br>`;
+  const l=document.createElement('span'); l.style.color='var(--accent)'; l.textContent=inviteLink();
+  $('share-invite-text').append(t,l);
+  const qr=$('share-qr'); qr.innerHTML='';
+  if(window.QRCode){ try{ new QRCode(qr,{text:inviteLink(),width:150,height:150}); }catch(e){} }
+  $('share').classList.remove('hidden');
+}
+$('btn-share').addEventListener('click', openShare);
+$('btn-share-end').addEventListener('click', openShare);
+$('btn-close-share').addEventListener('click', ()=>$('share').classList.add('hidden'));
+$('share').addEventListener('click', e=>{ if(e.target.id==='share') $('share').classList.add('hidden'); });
+$('btn-share-copy').addEventListener('click', ()=>{
+  copyText(inviteText()).then(ok=>toast(ok?'Invite copied — paste it anywhere!':'Copy failed'));
+});
+$('btn-share-native').addEventListener('click', async ()=>{
+  if(navigator.share){
+    try{ await navigator.share({title:'Chain Reaction', text:inviteText()}); return; }catch(e){ if(e.name==='AbortError') return; }
+  }
+  copyText(inviteText()).then(ok=>toast(ok?'Invite copied — share sheet not available here':'Copy failed'));
+});
+$('btn-start').addEventListener('click', ()=>{
+  if(!App.isHost || !H || H.players.length<2) return;
+  coreStart(H, hostBroadcast);
+});
+$('sel-lobby-grid').addEventListener('change', e=>{
+  if(App.isHost && H && H.phase==='lobby'){ H.gridKey=e.target.value; hostBroadcast(lobbyMsg()); }
+});
+$('btn-leave-lobby').addEventListener('click', cleanupAndHome);
+$('btn-leave-game').addEventListener('click', cleanupAndHome);
+$('btn-menu').addEventListener('click', cleanupAndHome);
+$('btn-again').addEventListener('click', ()=>{
+  $('end-overlay').classList.add('hidden');
+  if(App.mode==='local'){ coreStart(L, uiDispatch); }
+  else if(App.isHost){
+    H.phase='lobby';
+    H.players=H.players.filter(p=>!p.left);          // drop players who left
+    H.players.forEach((p,i)=>p.color=i);             // re-pack colors
+    H.players.forEach(p=>{p.alive=true; p.hasPlayed=false;});
+    hostBroadcast(lobbyMsg());
+  }
+});
+$('btn-mute').addEventListener('click', ()=>{
+  muted=!muted;
+  localStorage.setItem('crg-muted', muted?'1':'0');
+  $('btn-mute').textContent=muted?'🔇':'🔊';
+});
+$('btn-mute').textContent=muted?'🔇':'🔊';
+// unlock audio on the first real user gesture (required by iOS Safari)
+window.addEventListener('pointerdown', ()=>{
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+  }catch(e){}
+}, {once:true});
+$('btn-howto').addEventListener('click', ()=>$('howto').classList.remove('hidden'));
+$('btn-close-howto').addEventListener('click', ()=>$('howto').classList.add('hidden'));
+$('howto').addEventListener('click', e=>{ if(e.target.id==='howto') $('howto').classList.add('hidden'); });
+
+// ---------------- themes ----------------
+const THEME_NAMES=['nothing','apple','arcade'];
+function setTheme(name){
+  if(!THEME_NAMES.includes(name)) name='nothing';
+  document.body.dataset.theme=name;
+  localStorage.setItem('crg-theme',name);
+  document.querySelectorAll('.theme-opt').forEach(b=>b.classList.toggle('active', b.dataset.themeName===name));
+  document.querySelectorAll('.theme-select').forEach(s=>{ s.value=name; });
+}
+document.querySelectorAll('.theme-opt').forEach(b=>b.addEventListener('click', ()=>setTheme(b.dataset.themeName)));
+document.querySelectorAll('.theme-select').forEach(s=>s.addEventListener('change', e=>setTheme(e.target.value)));
+setTheme(localStorage.getItem('crg-theme')||'nothing');
+
+// remember the player's name
+$('inp-name').value = localStorage.getItem('crg-name') || '';
+$('inp-name').addEventListener('input', e=>localStorage.setItem('crg-name', e.target.value));
+
+// invite links: chainReaction.html#ABCD pre-fills the code (auto-joins if we know the name)
+(function(){
+  const m=(location.hash||'').match(/^#([A-Za-z0-9]{4})$/);
+  if(!m) return;
+  $('inp-code').value=m[1].toUpperCase();
+  if(($('inp-name').value||'').trim()){ toast('Joining room from invite link…'); setTimeout(joinRoom, 350); }
+  else toast('Room code loaded — enter your name and hit Join');
+})();
+</script>
+</body>
+</html>
