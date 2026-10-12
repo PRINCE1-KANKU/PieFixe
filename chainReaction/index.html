@@ -585,7 +585,7 @@ const criticalMass = (idx,rows,cols) => neighborsOf(idx,rows,cols).length;
 /* Applies a placement + all resulting explosions.
    Returns {steps, owner, count}. Each step is a list of {cell, owner, count}
    changes, in the order they should be animated. */
-function buildMoveSteps(owner, count, rows, cols, cell, p){
+function buildMoveSteps(owner, count, rows, cols, cell, p, stopWhen){
   owner=owner.slice(); count=count.slice();
   const steps=[];
   owner[cell]=p; count[cell]+=1;
@@ -604,6 +604,7 @@ function buildMoveSteps(owner, count, rows, cols, cell, p){
       if(count[n]>=criticalMass(n,rows,cols)) queue.push(n);
     }
     steps.push(step);
+    if(stopWhen && stopWhen(owner, count)) break;   // result already decided — stop splitting
   }
   return {steps, owner, count};
 }
@@ -630,7 +631,14 @@ function coreMove(G, idx, cell, emit){
 
   const before=G.owner.slice();                 // snapshot to detect captures
   const p=G.players[idx]; p.hasPlayed=true;
-  const r=buildMoveSteps(G.owner, G.count, G.rows, G.cols, cell, idx);
+  // Stop the chain as soon as the game is decided: every remaining orb belongs to
+  // the mover and every opponent has already had a turn (so they're eliminable).
+  // Prevents the board from pointlessly splitting after the opponents are defeated.
+  const stopWhen=(owner)=>{
+    for(const o of owner) if(o!==-1 && o!==idx) return false;   // an opponent still has orbs
+    return G.players.every((pl,i)=> i===idx || pl.hasPlayed || pl.left || !pl.alive);
+  };
+  const r=buildMoveSteps(G.owner, G.count, G.rows, G.cols, cell, idx, stopWhen);
   G.owner=r.owner; G.count=r.count;
   for(const s of r.steps) emit({t:'step', changes:s});
   // players (other than the mover) who lost at least one cell this move
